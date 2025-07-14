@@ -4,29 +4,22 @@
   <meta charset="UTF-8">
   <title>Dashboard Sampel Analisis</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Memuat Tailwind CSS untuk styling modern -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts: Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
   <style>
-    /* Menggunakan font Inter sebagai default */
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f1f5f9; /* bg-slate-200 */
+      background-color: #f1f5f9;
     }
 
-    /* CSS untuk transisi buka/tutup detail row */
     .detail-content {
       max-height: 0;
       overflow: hidden;
-      transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Animasi lebih halus */
+      transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .detail-content.expanded {
-      max-height: 1000px; /* Atur tinggi maksimal yang cukup untuk semua kemungkinan konten */
+      max-height: 1000px;
     }
   </style>
 </head>
@@ -48,12 +41,10 @@
         </div>
       </div>
 
-      <!-- Wrapper untuk tabel agar bisa menampilkan border dengan benar -->
       <div class="overflow-x-auto">
         <table id="dataTable" class="min-w-full text-sm">
           <thead class="bg-slate-50">
             <tr>
-              <!-- Header Tabel dengan gaya modern -->
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Waktu</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Grade</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Metode</th>
@@ -61,13 +52,10 @@
               <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Elemen</th>
               <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">NG</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"></th>
+              <th class="px-6 py-3"></th>
             </tr>
           </thead>
-          <!-- Body tabel akan diisi oleh JavaScript -->
-          <tbody class="bg-white divide-y divide-slate-200">
-            <!-- Konten dinamis akan dimuat di sini -->
-          </tbody>
+          <tbody class="bg-white divide-y divide-slate-200"></tbody>
         </table>
       </div>
     </div>
@@ -79,150 +67,110 @@
   <script>
     const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
     const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqcnd2b3p1eWlkamZ5amZxcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjIwMjgsImV4cCI6MjA2Nzk5ODAyOH0.u5t_yWbYINBKldTl-0dMjo006zTxExfx8kvKmntrkNE";
+
     const tableBody = document.querySelector("#dataTable tbody");
     const refreshBtn = document.querySelector("#refreshBtn");
     const refreshIcon = document.querySelector("#refreshIcon");
 
-    // Fungsi untuk memformat tanggal menjadi lebih mudah dibaca dan valid
-    function formatTime(timeString) {
-      if (!timeString) return "-";
-      // Mengganti spasi dengan 'T' agar menjadi format ISO 8601 yang valid
-      // dan dapat diparsing oleh semua browser
-      const parsableDateString = timeString.replace(' ', 'T');
-      const date = new Date(parsableDateString);
-      
-      // Cek apakah hasil parsing tanggal valid
-      if (isNaN(date.getTime())) {
-        return timeString; // Jika tidak valid, kembalikan string asli
-      }
-
-      return date.toLocaleString('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+    function formatFromHeader(day, month, year, time) {
+      const fullDate = `20${year}-${month}-${day}T${time}`;
+      const d = new Date(fullDate);
+      if (isNaN(d.getTime())) return `${day}/${month}/${year} ${time}`;
+      return d.toLocaleString("id-ID", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
       });
     }
-    
+
     async function loadData() {
-      // Tampilkan indikator loading
       refreshIcon.classList.add('animate-spin');
       tableBody.innerHTML = `
         <tr>
-          <td colspan="8" class="text-center p-10 text-slate-500">
-            <div class="flex justify-center items-center space-x-2">
-              <svg class="animate-spin h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Memuat data...</span>
-            </div>
-          </td>
+          <td colspan="8" class="text-center p-10 text-slate-500">Memuat data...</td>
         </tr>
       `;
 
       try {
-        // Ambil data header dari Supabase
         const resHeader = await fetch(`${supabaseUrl}/rest/v1/result_header?order=created_at.desc&limit=10`, {
           headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
         });
 
-        if (!resHeader.ok) throw new Error(`Gagal mengambil data: ${resHeader.statusText}`);
-
         const headersData = await resHeader.json();
-        tableBody.innerHTML = ""; // Kosongkan tabel setelah data diterima
+        tableBody.innerHTML = "";
 
         if (headersData.length === 0) {
-             tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-slate-500">Tidak ada data untuk ditampilkan.</td></tr>`;
-             return;
+          tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-slate-500">Tidak ada data.</td></tr>`;
+          return;
         }
 
         for (const header of headersData) {
           const resultId = header.id;
-
-          // Ambil data elemen terkait
           const resElements = await fetch(`${supabaseUrl}/rest/v1/result_element?result_id=eq.${resultId}`, {
             headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
           });
-          
-          if (!resElements.ok) {
-            console.warn(`Gagal mengambil elemen untuk result ID ${resultId}`);
-            continue;
-          }
-
           const elements = await resElements.json();
+
           const total = elements.length;
           const ngCount = elements.filter(el => el.element_flag === ">" || el.element_flag === "<").length;
           const status = ngCount > 0 ? "NG" : "OK";
-          
-          const statusBadgeClass = status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
-          const rowHoverClass = status === "OK" ? "hover:bg-green-50/50" : "hover:bg-red-50/50";
 
-          // Buat baris utama (main row)
+          const waktu = formatFromHeader(header.day, header.month, header.year, header.time);
+          const badgeClass = status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
+          const rowHover = status === "OK" ? "hover:bg-green-50/50" : "hover:bg-red-50/50";
+
           const row = document.createElement("tr");
-          row.className = `cursor-pointer transition-colors duration-200 ${rowHoverClass}`;
+          row.className = `cursor-pointer transition-colors duration-200 ${rowHover}`;
           row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-slate-600">${formatTime(header.created_at)}</td>
-            <td class="px-6 py-4 whitespace-nowrap font-semibold text-slate-800">${header.grade ?? "-"}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-slate-600">${header.analytical_method ?? "-"}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">${header.runs_done ?? "-"}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">${total}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center font-bold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass}">
+            <td class="px-6 py-4 text-slate-600">${waktu}</td>
+            <td class="px-6 py-4 font-semibold text-slate-800">${header.grade}</td>
+            <td class="px-6 py-4 text-slate-600">${header.analytical_method}</td>
+            <td class="px-6 py-4 text-center text-slate-600">${header.runs_done}</td>
+            <td class="px-6 py-4 text-center text-slate-600">${total}</td>
+            <td class="px-6 py-4 text-center font-bold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
+            <td class="px-6 py-4">
+              <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full ${badgeClass}">
                 ${status}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right">
-              <svg class="h-5 w-5 text-slate-400 transition-transform duration-300 chevron-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <td class="px-6 py-4 text-right">
+              <svg class="h-5 w-5 text-slate-400 transition-transform duration-300 chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
               </svg>
             </td>
           `;
 
-          // Buat baris detail (awalnya tersembunyi)
           const detailRow = document.createElement("tr");
           const detailCell = document.createElement("td");
           detailCell.colSpan = 8;
-          detailCell.className = "p-0"; // Hapus padding dari sel agar animasi mulus
+          detailCell.className = "p-0";
 
           const detailContent = document.createElement("div");
-          detailContent.className = "detail-content"; // Div ini untuk animasi
-          
-          const innerContent = document.createElement('div');
-          innerContent.className = "p-5 bg-slate-50"; // Div ini untuk konten dan padding
+          detailContent.className = "detail-content";
+
+          const inner = document.createElement("div");
+          inner.className = "p-5 bg-slate-50";
 
           const elementTable = document.createElement("table");
           elementTable.className = "min-w-full text-xs";
           elementTable.innerHTML = `
             <thead class="bg-slate-200">
-              <tr>
-                <th class="py-2 px-4 text-left font-semibold text-slate-600 rounded-tl-lg">Elemen</th>
-                <th class="py-2 px-4 text-left font-semibold text-slate-600">Nilai</th>
-                <th class="py-2 px-4 text-left font-semibold text-slate-600 rounded-tr-lg">Flag</th>
-              </tr>
+              <tr><th class="py-2 px-4">Elemen</th><th class="py-2 px-4">Nilai</th><th class="py-2 px-4">Flag</th></tr>
             </thead>
             <tbody>
               ${elements.map(el => `
-                <tr class="border-b border-slate-200 last:border-b-0 hover:bg-slate-100">
-                  <td class="py-2 px-4 text-slate-600">${el.element_name}</td>
-                  <td class="py-2 px-4 text-slate-600">${el.element_value}</td>
-                  <td class="py-2 px-4 font-bold ${el.element_flag === '>' || el.element_flag === '<' ? 'text-red-500' : 'text-green-600'}">
-                    ${el.element_flag || "OK"}
-                  </td>
-                </tr>
-              `).join("")}
+                <tr class="border-b hover:bg-slate-100">
+                  <td class="py-2 px-4">${el.element_name}</td>
+                  <td class="py-2 px-4">${el.element_value}</td>
+                  <td class="py-2 px-4 font-bold ${el.element_flag === ">" || el.element_flag === "<" ? "text-red-600" : "text-green-600"}">${el.element_flag || "OK"}</td>
+                </tr>`).join("")}
             </tbody>
           `;
-          
-          innerContent.appendChild(elementTable);
-          detailContent.appendChild(innerContent);
+
+          inner.appendChild(elementTable);
+          detailContent.appendChild(inner);
           detailCell.appendChild(detailContent);
           detailRow.appendChild(detailCell);
 
-          // Logika untuk toggle detail on click
           row.addEventListener("click", () => {
             const icon = row.querySelector('.chevron-icon');
             detailContent.classList.toggle("expanded");
@@ -232,20 +180,15 @@
           tableBody.appendChild(row);
           tableBody.appendChild(detailRow);
         }
-
-      } catch (err) {
-        console.error("Fetch error:", err);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-red-600 bg-red-50"><strong>Error:</strong> ${err.message}</td></tr>`;
+      } catch (e) {
+        console.error(e);
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-red-600">Error: ${e.message}</td></tr>`;
       } finally {
-        // Hentikan animasi loading
         refreshIcon.classList.remove('animate-spin');
       }
     }
 
-    // Tambahkan event listener untuk tombol refresh
     refreshBtn.addEventListener("click", loadData);
-
-    // Panggil fungsi untuk memuat data saat halaman dibuka
     loadData();
   </script>
 </body>
