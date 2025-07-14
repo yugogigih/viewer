@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Sample Viewer - OK/NG + Detail</title>
+  <title>Dashboard Sampel Analisis</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Memuat Tailwind CSS untuk styling modern -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,6 +15,7 @@
     /* Menggunakan font Inter sebagai default */
     body {
       font-family: 'Inter', sans-serif;
+      background-color: #f1f5f9; /* bg-slate-200 */
     }
 
     /* CSS untuk transisi buka/tutup detail row */
@@ -22,21 +23,29 @@
       max-height: 0;
       overflow: hidden;
       transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Animasi lebih halus */
-      background-color: #f8fafc; /* Warna latar belakang untuk sub-tabel */
     }
 
     .detail-content.expanded {
-      max-height: 500px; /* Atur tinggi maksimal yang cukup untuk konten */
+      max-height: 1000px; /* Atur tinggi maksimal yang cukup untuk semua kemungkinan konten */
     }
   </style>
 </head>
 <body class="bg-slate-100">
 
   <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-      <div class="p-6">
-        <h2 class="text-2xl font-bold text-slate-800">Sampel Terbaru</h2>
-        <p class="text-slate-500 mt-1">Menampilkan 10 hasil terakhir. Klik baris untuk melihat detail.</p>
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
+      <div class="p-6 flex justify-between items-center bg-slate-50 border-b border-slate-200">
+        <div>
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-800">Laporan Sampel Terbaru</h2>
+            <p class="text-slate-500 mt-1 text-sm">Menampilkan 10 hasil terakhir. Klik baris untuk detail.</p>
+        </div>
+        <div>
+            <button id="refreshBtn" title="Muat Ulang Data" class="p-2 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-700 active:bg-slate-300 transition-colors duration-200">
+                <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M2.46 15a9 9 0 113.99-12.55L8 9"/>
+                </svg>
+            </button>
+        </div>
       </div>
 
       <!-- Wrapper untuk tabel agar bisa menampilkan border dengan benar -->
@@ -48,9 +57,9 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Waktu</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Grade</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Metode</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Runs</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Elemen</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">NG</th>
+              <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Runs</th>
+              <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Elemen</th>
+              <th class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">NG</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"></th>
             </tr>
@@ -62,8 +71,8 @@
         </table>
       </div>
     </div>
-    <footer class="text-center mt-6 text-sm text-slate-500">
-      <p>Data diambil dari Supabase Realtime.</p>
+    <footer class="text-center mt-8 text-sm text-slate-500">
+      <p>Dashboard Analisis Sampel</p>
     </footer>
   </div>
 
@@ -71,25 +80,38 @@
     const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
     const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqcnd2b3p1eWlkamZ5amZxcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjIwMjgsImV4cCI6MjA2Nzk5ODAyOH0.u5t_yWbYINBKldTl-0dMjo006zTxExfx8kvKmntrkNE";
     const tableBody = document.querySelector("#dataTable tbody");
+    const refreshBtn = document.querySelector("#refreshBtn");
+    const refreshIcon = document.querySelector("#refreshIcon");
 
-    // Fungsi untuk memformat tanggal menjadi lebih mudah dibaca
-    function formatTime(isoString) {
-      if (!isoString) return "-";
-      const date = new Date(isoString);
+    // Fungsi untuk memformat tanggal menjadi lebih mudah dibaca dan valid
+    function formatTime(timeString) {
+      if (!timeString) return "-";
+      // Mengganti spasi dengan 'T' agar menjadi format ISO 8601 yang valid
+      // dan dapat diparsing oleh semua browser
+      const parsableDateString = timeString.replace(' ', 'T');
+      const date = new Date(parsableDateString);
+      
+      // Cek apakah hasil parsing tanggal valid
+      if (isNaN(date.getTime())) {
+        return timeString; // Jika tidak valid, kembalikan string asli
+      }
+
       return date.toLocaleString('id-ID', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        second: '2-digit'
       });
     }
     
     async function loadData() {
       // Tampilkan indikator loading
+      refreshIcon.classList.add('animate-spin');
       tableBody.innerHTML = `
         <tr>
-          <td colspan="8" class="text-center p-8 text-slate-500">
+          <td colspan="8" class="text-center p-10 text-slate-500">
             <div class="flex justify-center items-center space-x-2">
               <svg class="animate-spin h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -104,21 +126,16 @@
       try {
         // Ambil data header dari Supabase
         const resHeader = await fetch(`${supabaseUrl}/rest/v1/result_header?order=created_at.desc&limit=10`, {
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${anonKey}`
-          }
+          headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
         });
 
-        if (!resHeader.ok) {
-            throw new Error(`Gagal mengambil data header: ${resHeader.statusText}`);
-        }
+        if (!resHeader.ok) throw new Error(`Gagal mengambil data: ${resHeader.statusText}`);
 
         const headersData = await resHeader.json();
         tableBody.innerHTML = ""; // Kosongkan tabel setelah data diterima
 
         if (headersData.length === 0) {
-             tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-slate-500">Tidak ada data untuk ditampilkan.</td></tr>`;
+             tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-slate-500">Tidak ada data untuk ditampilkan.</td></tr>`;
              return;
         }
 
@@ -127,15 +144,12 @@
 
           // Ambil data elemen terkait
           const resElements = await fetch(`${supabaseUrl}/rest/v1/result_element?result_id=eq.${resultId}`, {
-            headers: {
-              apikey: anonKey,
-              Authorization: `Bearer ${anonKey}`
-            }
+            headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
           });
           
           if (!resElements.ok) {
             console.warn(`Gagal mengambil elemen untuk result ID ${resultId}`);
-            continue; // Lanjutkan ke iterasi berikutnya jika detail gagal diambil
+            continue;
           }
 
           const elements = await resElements.json();
@@ -143,24 +157,19 @@
           const ngCount = elements.filter(el => el.element_flag === ">" || el.element_flag === "<").length;
           const status = ngCount > 0 ? "NG" : "OK";
           
-          // Tentukan style berdasarkan status
-          const statusBadgeClass = status === "OK" 
-            ? "bg-green-100 text-green-800" 
-            : "bg-red-100 text-red-800";
-          const rowHoverClass = status === "OK"
-            ? "hover:bg-green-50"
-            : "hover:bg-red-50";
+          const statusBadgeClass = status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
+          const rowHoverClass = status === "OK" ? "hover:bg-green-50/50" : "hover:bg-red-50/50";
 
           // Buat baris utama (main row)
           const row = document.createElement("tr");
           row.className = `cursor-pointer transition-colors duration-200 ${rowHoverClass}`;
           row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-slate-700">${formatTime(header.time)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-slate-700">${header.grade ?? "-"}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-slate-700">${header.analytical_method ?? "-"}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-700">${header.runs_done ?? "-"}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-700">${total}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center font-semibold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-slate-600">${formatTime(header.created_at)}</td>
+            <td class="px-6 py-4 whitespace-nowrap font-semibold text-slate-800">${header.grade ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-slate-600">${header.analytical_method ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">${header.runs_done ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">${total}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center font-bold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass}">
                 ${status}
@@ -176,28 +185,31 @@
           // Buat baris detail (awalnya tersembunyi)
           const detailRow = document.createElement("tr");
           const detailCell = document.createElement("td");
-          detailCell.colSpan = 8; // Sesuaikan dengan jumlah kolom
-          
-          const detailContent = document.createElement("div");
-          detailContent.className = "detail-content p-4";
+          detailCell.colSpan = 8;
+          detailCell.className = "p-0"; // Hapus padding dari sel agar animasi mulus
 
-          // Buat tabel untuk detail elemen
+          const detailContent = document.createElement("div");
+          detailContent.className = "detail-content"; // Div ini untuk animasi
+          
+          const innerContent = document.createElement('div');
+          innerContent.className = "p-5 bg-slate-50"; // Div ini untuk konten dan padding
+
           const elementTable = document.createElement("table");
           elementTable.className = "min-w-full text-xs";
           elementTable.innerHTML = `
-            <thead class="border-b border-slate-300">
+            <thead class="bg-slate-200">
               <tr>
-                <th class="py-2 px-4 text-left font-semibold text-slate-600">Elemen</th>
+                <th class="py-2 px-4 text-left font-semibold text-slate-600 rounded-tl-lg">Elemen</th>
                 <th class="py-2 px-4 text-left font-semibold text-slate-600">Nilai</th>
-                <th class="py-2 px-4 text-left font-semibold text-slate-600">Flag</th>
+                <th class="py-2 px-4 text-left font-semibold text-slate-600 rounded-tr-lg">Flag</th>
               </tr>
             </thead>
             <tbody>
               ${elements.map(el => `
-                <tr class="border-b border-slate-200 last:border-b-0">
+                <tr class="border-b border-slate-200 last:border-b-0 hover:bg-slate-100">
                   <td class="py-2 px-4 text-slate-600">${el.element_name}</td>
                   <td class="py-2 px-4 text-slate-600">${el.element_value}</td>
-                  <td class="py-2 px-4 font-bold ${el.element_flag === '>' || el.element_flag === '<' ? 'text-red-500' : 'text-green-500'}">
+                  <td class="py-2 px-4 font-bold ${el.element_flag === '>' || el.element_flag === '<' ? 'text-red-500' : 'text-green-600'}">
                     ${el.element_flag || "OK"}
                   </td>
                 </tr>
@@ -205,7 +217,8 @@
             </tbody>
           `;
           
-          detailContent.appendChild(elementTable);
+          innerContent.appendChild(elementTable);
+          detailContent.appendChild(innerContent);
           detailCell.appendChild(detailContent);
           detailRow.appendChild(detailCell);
 
@@ -222,9 +235,15 @@
 
       } catch (err) {
         console.error("Fetch error:", err);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-500 bg-red-50">Error: ${err.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-red-600 bg-red-50"><strong>Error:</strong> ${err.message}</td></tr>`;
+      } finally {
+        // Hentikan animasi loading
+        refreshIcon.classList.remove('animate-spin');
       }
     }
+
+    // Tambahkan event listener untuk tombol refresh
+    refreshBtn.addEventListener("click", loadData);
 
     // Panggil fungsi untuk memuat data saat halaman dibuka
     loadData();
