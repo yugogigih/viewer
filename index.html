@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Sample Viewer</title>
+  <title>Sample Viewer - OK/NG</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
@@ -26,55 +26,86 @@
       background-color: #f0f0f0;
     }
 
-    tr:hover {
-      background-color: #f9f9f9;
+    tr.ok {
+      background-color: #d4edda;
+    }
+
+    tr.ng {
+      background-color: #f8d7da;
     }
   </style>
 </head>
 <body>
-  <h2>Latest Samples</h2>
+  <h2>Latest Samples with OK/NG Status</h2>
   <table id="dataTable">
-    <thead></thead>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Grade</th>
+        <th>Method</th>
+        <th>Runs Done</th>
+        <th>Total Elements</th>
+        <th>NG Count</th>
+        <th>Status</th>
+      </tr>
+    </thead>
     <tbody></tbody>
   </table>
 
   <script>
-    // GANTI dengan Supabase Project URL kamu
     const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
-
-    // GANTI dengan anon key Supabase kamu, TANPA "Bearer"
     const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqcnd2b3p1eWlkamZ5amZxcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjIwMjgsImV4cCI6MjA2Nzk5ODAyOH0.u5t_yWbYINBKldTl-0dMjo006zTxExfx8kvKmntrkNE";
+    const tableBody = document.querySelector("#dataTable tbody");
 
-    // Tabel yang ingin ditampilkan
-    const tableName = "result_header";
+    async function loadData() {
+      try {
+        const resHeader = await fetch(`${supabaseUrl}/rest/v1/result_header?order=created_at.desc&limit=10`, {
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`
+          }
+        });
 
-    // Fetch data dari Supabase
-    fetch(`${supabaseUrl}/rest/v1/${tableName}?order=created_at.desc&limit=10`, {
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`
+        const headersData = await resHeader.json();
+        tableBody.innerHTML = "";
+
+        for (const header of headersData) {
+          const resultId = header.id;
+
+          const resElements = await fetch(`${supabaseUrl}/rest/v1/result_element?result_id=eq.${resultId}`, {
+            headers: {
+              apikey: anonKey,
+              Authorization: `Bearer ${anonKey}`
+            }
+          });
+
+          const elements = await resElements.json();
+          const total = elements.length;
+          const ngCount = elements.filter(el => el.element_flag === ">" || el.element_flag === "<").length;
+          const status = ngCount > 0 ? "NG" : "OK";
+          const rowClass = ngCount > 0 ? "ng" : "ok";
+
+          const row = document.createElement("tr");
+          row.className = rowClass;
+          row.innerHTML = `
+            <td>${header.time ?? "-"}</td>
+            <td>${header.grade ?? "-"}</td>
+            <td>${header.analytical_method ?? "-"}</td>
+            <td>${header.runs_done ?? "-"}</td>
+            <td>${total}</td>
+            <td>${ngCount}</td>
+            <td><strong>${status}</strong></td>
+          `;
+          tableBody.appendChild(row);
+        }
+
+      } catch (err) {
+        console.error("Fetch error:", err);
+        tableBody.innerHTML = `<tr><td colspan="7">Error: ${err.message}</td></tr>`;
       }
-    })
-    .then(res => res.json())
-    .then(data => {
-      const tableHead = document.querySelector("#dataTable thead");
-      const tableBody = document.querySelector("#dataTable tbody");
+    }
 
-      if (data.length > 0) {
-        const headers = Object.keys(data[0]);
-        tableHead.innerHTML = "<tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr>";
-        tableBody.innerHTML = data.map(row =>
-          "<tr>" + headers.map(h => `<td>${row[h]}</td>`).join("") + "</tr>"
-        ).join("");
-      } else {
-        tableBody.innerHTML = "<tr><td colspan='100%'>No data found</td></tr>";
-      }
-    })
-    .catch(err => {
-      document.querySelector("#dataTable tbody").innerHTML =
-        `<tr><td colspan='100%'>Error fetching data: ${err.message}</td></tr>`;
-      console.error("Fetch error:", err);
-    });
+    loadData();
   </script>
 </body>
 </html>
