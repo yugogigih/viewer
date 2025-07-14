@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Sample Viewer - OK/NG</title>
+  <title>Sample Viewer - OK/NG + Detail</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
@@ -32,6 +32,23 @@
 
     tr.ng {
       background-color: #f8d7da;
+    }
+
+    .subtable td {
+      background-color: #f9f9f9;
+      font-size: 0.9em;
+    }
+
+    .clickable {
+      cursor: pointer;
+    }
+
+    .element-flag {
+      font-weight: bold;
+    }
+
+    .element-flag[data-flag=">"], .element-flag[data-flag="<"] {
+      color: red;
     }
   </style>
 </head>
@@ -85,8 +102,9 @@
           const status = ngCount > 0 ? "NG" : "OK";
           const rowClass = ngCount > 0 ? "ng" : "ok";
 
+          // Main row
           const row = document.createElement("tr");
-          row.className = rowClass;
+          row.className = `${rowClass} clickable`;
           row.innerHTML = `
             <td>${header.time ?? "-"}</td>
             <td>${header.grade ?? "-"}</td>
@@ -96,7 +114,40 @@
             <td>${ngCount}</td>
             <td><strong>${status}</strong></td>
           `;
+
+          // Detail row (hidden initially)
+          const detailRow = document.createElement("tr");
+          const detailCell = document.createElement("td");
+          detailCell.colSpan = 7;
+
+          const elementTable = document.createElement("table");
+          elementTable.classList.add("subtable");
+          elementTable.innerHTML = `
+            <thead>
+              <tr><th>Element</th><th>Value</th><th>Flag</th></tr>
+            </thead>
+            <tbody>
+              ${elements.map(el => `
+                <tr>
+                  <td>${el.element_name}</td>
+                  <td>${el.element_value}</td>
+                  <td class="element-flag" data-flag="${el.element_flag}">${el.element_flag || "OK"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          `;
+
+          detailCell.appendChild(elementTable);
+          detailRow.appendChild(detailCell);
+          detailRow.style.display = "none";
+
+          // Toggle detail on click
+          row.addEventListener("click", () => {
+            detailRow.style.display = detailRow.style.display === "none" ? "table-row" : "none";
+          });
+
           tableBody.appendChild(row);
+          tableBody.appendChild(detailRow);
         }
 
       } catch (err) {
