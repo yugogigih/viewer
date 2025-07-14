@@ -1,81 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
   <meta charset="UTF-8">
   <title>Sample Viewer - OK/NG + Detail</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Memuat Tailwind CSS untuk styling modern -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
+    /* Menggunakan font Inter sebagai default */
     body {
-      font-family: sans-serif;
-      padding: 1rem;
+      font-family: 'Inter', sans-serif;
     }
 
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 1rem;
+    /* CSS untuk transisi buka/tutup detail row */
+    .detail-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Animasi lebih halus */
+      background-color: #f8fafc; /* Warna latar belakang untuk sub-tabel */
     }
 
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: left;
-    }
-
-    th {
-      background-color: #f0f0f0;
-    }
-
-    tr.ok {
-      background-color: #d4edda;
-    }
-
-    tr.ng {
-      background-color: #f8d7da;
-    }
-
-    .subtable td {
-      background-color: #f9f9f9;
-      font-size: 0.9em;
-    }
-
-    .clickable {
-      cursor: pointer;
-    }
-
-    .element-flag {
-      font-weight: bold;
-    }
-
-    .element-flag[data-flag=">"], .element-flag[data-flag="<"] {
-      color: red;
+    .detail-content.expanded {
+      max-height: 500px; /* Atur tinggi maksimal yang cukup untuk konten */
     }
   </style>
 </head>
-<body>
-  <h2>Latest Samples with OK/NG Status</h2>
-  <table id="dataTable">
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Grade</th>
-        <th>Method</th>
-        <th>Runs Done</th>
-        <th>Total Elements</th>
-        <th>NG Count</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<body class="bg-slate-100">
+
+  <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+      <div class="p-6">
+        <h2 class="text-2xl font-bold text-slate-800">Sampel Terbaru</h2>
+        <p class="text-slate-500 mt-1">Menampilkan 10 hasil terakhir. Klik baris untuk melihat detail.</p>
+      </div>
+
+      <!-- Wrapper untuk tabel agar bisa menampilkan border dengan benar -->
+      <div class="overflow-x-auto">
+        <table id="dataTable" class="min-w-full text-sm">
+          <thead class="bg-slate-50">
+            <tr>
+              <!-- Header Tabel dengan gaya modern -->
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Waktu</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Grade</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Metode</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Runs</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Elemen</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">NG</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"></th>
+            </tr>
+          </thead>
+          <!-- Body tabel akan diisi oleh JavaScript -->
+          <tbody class="bg-white divide-y divide-slate-200">
+            <!-- Konten dinamis akan dimuat di sini -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <footer class="text-center mt-6 text-sm text-slate-500">
+      <p>Data diambil dari Supabase Realtime.</p>
+    </footer>
+  </div>
 
   <script>
     const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
     const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqcnd2b3p1eWlkamZ5amZxcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjIwMjgsImV4cCI6MjA2Nzk5ODAyOH0.u5t_yWbYINBKldTl-0dMjo006zTxExfx8kvKmntrkNE";
     const tableBody = document.querySelector("#dataTable tbody");
 
+    // Fungsi untuk memformat tanggal menjadi lebih mudah dibaca
+    function formatTime(isoString) {
+      if (!isoString) return "-";
+      const date = new Date(isoString);
+      return date.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
     async function loadData() {
+      // Tampilkan indikator loading
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="8" class="text-center p-8 text-slate-500">
+            <div class="flex justify-center items-center space-x-2">
+              <svg class="animate-spin h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Memuat data...</span>
+            </div>
+          </td>
+        </tr>
+      `;
+
       try {
+        // Ambil data header dari Supabase
         const resHeader = await fetch(`${supabaseUrl}/rest/v1/result_header?order=created_at.desc&limit=10`, {
           headers: {
             apikey: anonKey,
@@ -83,67 +110,110 @@
           }
         });
 
+        if (!resHeader.ok) {
+            throw new Error(`Gagal mengambil data header: ${resHeader.statusText}`);
+        }
+
         const headersData = await resHeader.json();
-        tableBody.innerHTML = "";
+        tableBody.innerHTML = ""; // Kosongkan tabel setelah data diterima
+
+        if (headersData.length === 0) {
+             tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-slate-500">Tidak ada data untuk ditampilkan.</td></tr>`;
+             return;
+        }
 
         for (const header of headersData) {
           const resultId = header.id;
 
+          // Ambil data elemen terkait
           const resElements = await fetch(`${supabaseUrl}/rest/v1/result_element?result_id=eq.${resultId}`, {
             headers: {
               apikey: anonKey,
               Authorization: `Bearer ${anonKey}`
             }
           });
+          
+          if (!resElements.ok) {
+            console.warn(`Gagal mengambil elemen untuk result ID ${resultId}`);
+            continue; // Lanjutkan ke iterasi berikutnya jika detail gagal diambil
+          }
 
           const elements = await resElements.json();
           const total = elements.length;
           const ngCount = elements.filter(el => el.element_flag === ">" || el.element_flag === "<").length;
           const status = ngCount > 0 ? "NG" : "OK";
-          const rowClass = ngCount > 0 ? "ng" : "ok";
+          
+          // Tentukan style berdasarkan status
+          const statusBadgeClass = status === "OK" 
+            ? "bg-green-100 text-green-800" 
+            : "bg-red-100 text-red-800";
+          const rowHoverClass = status === "OK"
+            ? "hover:bg-green-50"
+            : "hover:bg-red-50";
 
-          // Main row
+          // Buat baris utama (main row)
           const row = document.createElement("tr");
-          row.className = `${rowClass} clickable`;
+          row.className = `cursor-pointer transition-colors duration-200 ${rowHoverClass}`;
           row.innerHTML = `
-            <td>${header.time ?? "-"}</td>
-            <td>${header.grade ?? "-"}</td>
-            <td>${header.analytical_method ?? "-"}</td>
-            <td>${header.runs_done ?? "-"}</td>
-            <td>${total}</td>
-            <td>${ngCount}</td>
-            <td><strong>${status}</strong></td>
+            <td class="px-6 py-4 whitespace-nowrap text-slate-700">${formatTime(header.time)}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-slate-700">${header.grade ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-slate-700">${header.analytical_method ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-700">${header.runs_done ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-700">${total}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center font-semibold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass}">
+                ${status}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right">
+              <svg class="h-5 w-5 text-slate-400 transition-transform duration-300 chevron-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </td>
           `;
 
-          // Detail row (hidden initially)
+          // Buat baris detail (awalnya tersembunyi)
           const detailRow = document.createElement("tr");
           const detailCell = document.createElement("td");
-          detailCell.colSpan = 7;
+          detailCell.colSpan = 8; // Sesuaikan dengan jumlah kolom
+          
+          const detailContent = document.createElement("div");
+          detailContent.className = "detail-content p-4";
 
+          // Buat tabel untuk detail elemen
           const elementTable = document.createElement("table");
-          elementTable.classList.add("subtable");
+          elementTable.className = "min-w-full text-xs";
           elementTable.innerHTML = `
-            <thead>
-              <tr><th>Element</th><th>Value</th><th>Flag</th></tr>
+            <thead class="border-b border-slate-300">
+              <tr>
+                <th class="py-2 px-4 text-left font-semibold text-slate-600">Elemen</th>
+                <th class="py-2 px-4 text-left font-semibold text-slate-600">Nilai</th>
+                <th class="py-2 px-4 text-left font-semibold text-slate-600">Flag</th>
+              </tr>
             </thead>
             <tbody>
               ${elements.map(el => `
-                <tr>
-                  <td>${el.element_name}</td>
-                  <td>${el.element_value}</td>
-                  <td class="element-flag" data-flag="${el.element_flag}">${el.element_flag || "OK"}</td>
+                <tr class="border-b border-slate-200 last:border-b-0">
+                  <td class="py-2 px-4 text-slate-600">${el.element_name}</td>
+                  <td class="py-2 px-4 text-slate-600">${el.element_value}</td>
+                  <td class="py-2 px-4 font-bold ${el.element_flag === '>' || el.element_flag === '<' ? 'text-red-500' : 'text-green-500'}">
+                    ${el.element_flag || "OK"}
+                  </td>
                 </tr>
               `).join("")}
             </tbody>
           `;
-
-          detailCell.appendChild(elementTable);
+          
+          detailContent.appendChild(elementTable);
+          detailCell.appendChild(detailContent);
           detailRow.appendChild(detailCell);
-          detailRow.style.display = "none";
 
-          // Toggle detail on click
+          // Logika untuk toggle detail on click
           row.addEventListener("click", () => {
-            detailRow.style.display = detailRow.style.display === "none" ? "table-row" : "none";
+            const icon = row.querySelector('.chevron-icon');
+            detailContent.classList.toggle("expanded");
+            icon.classList.toggle("rotate-180");
           });
 
           tableBody.appendChild(row);
@@ -152,10 +222,11 @@
 
       } catch (err) {
         console.error("Fetch error:", err);
-        tableBody.innerHTML = `<tr><td colspan="7">Error: ${err.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-500 bg-red-50">Error: ${err.message}</td></tr>`;
       }
     }
 
+    // Panggil fungsi untuk memuat data saat halaman dibuka
     loadData();
   </script>
 </body>
