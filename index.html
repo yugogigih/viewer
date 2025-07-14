@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sample Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h2>Latest Samples</h2>
+  <table id="dataTable"><thead></thead><tbody></tbody></table>
+
+  <script>
+    const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
+    const table = "result_header";
+    const anonKey = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6..."; // Ganti dengan anon key kamu
+
+    fetch(`${supabaseUrl}/rest/v1/${table}?order=created_at.desc&limit=10`, {
+      headers: {
+        apikey: anonKey,
+        Authorization: anonKey
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      const tableHead = document.querySelector("#dataTable thead");
+      const tableBody = document.querySelector("#dataTable tbody");
+
+      if (data.length > 0) {
+        const headers = Object.keys(data[0]);
+        tableHead.innerHTML = "<tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr>";
+        tableBody.innerHTML = data.map(row =>
+          "<tr>" + headers.map(h => `<td>${row[h]}</td>`).join("") + "</tr>"
+        ).join("");
+      } else {
+        tableBody.innerHTML = "<tr><td colspan='100%'>No data found</td></tr>";
+      }
+    });
+  </script>
+</body>
+</html>
