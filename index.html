@@ -2,24 +2,37 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard Sampel Analisis</title>
+  <title>Dashboard Sampel Analisis - Live</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Memuat Supabase Client Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f1f5f9;
+      background-color: #f1f5f9; /* bg-slate-100 */
     }
-
     .detail-content {
       max-height: 0;
       overflow: hidden;
       transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
     .detail-content.expanded {
       max-height: 1000px;
+    }
+    /* Animasi untuk baris baru yang masuk */
+    @keyframes fadeIn {
+      from { background-color: #d1fae5; /* bg-green-100 */ transform: scale(0.98); }
+      to { background-color: white; transform: scale(1); }
+    }
+    .new-row {
+      animation: fadeIn 2s ease-out;
+    }
+    /* Style untuk tombol pagination yang dinonaktifkan */
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
   </style>
 </head>
@@ -27,18 +40,49 @@
 
   <div class="container mx-auto p-4 sm:p-6 lg:p-8">
     <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
-      <div class="p-6 flex justify-between items-center bg-slate-50 border-b border-slate-200">
+      <div class="p-6 flex justify-between items-center bg-slate-50 border-b border-slate-200 flex-wrap gap-4">
         <div>
             <h2 class="text-xl sm:text-2xl font-bold text-slate-800">Laporan Sampel Terbaru</h2>
-            <p class="text-slate-500 mt-1 text-sm">Menampilkan 10 hasil terakhir. Klik baris untuk detail.</p>
+            <p class="text-slate-500 mt-1 text-sm">Data diperbarui secara otomatis.</p>
         </div>
-        <div>
-            <button id="refreshBtn" title="Muat Ulang Data" class="p-2 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-700 active:bg-slate-300 transition-colors duration-200">
-                <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M2.46 15a9 9 0 113.99-12.55L8 9"/>
-                </svg>
-            </button>
+        <div class="flex items-center space-x-4">
+            <div id="statusIndicator" class="flex items-center space-x-2">
+                <span id="statusDot" class="h-3 w-3 rounded-full bg-yellow-400"></span>
+                <span id="statusText" class="text-sm font-medium text-slate-600">Menyambungkan...</span>
+            </div>
         </div>
+      </div>
+
+      <!-- Filter dan Kontrol Pencarian -->
+      <div class="p-4 bg-slate-50/50 border-b border-slate-200">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="relative">
+                  <label for="searchInput" class="text-xs font-semibold text-slate-600 mb-1 block">Pencarian</label>
+                  <input type="text" id="searchInput" placeholder="Grade atau Metode..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                  <div class="absolute bottom-2.5 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg class="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
+              </div>
+              <div>
+                  <label for="statusFilter" class="text-xs font-semibold text-slate-600 mb-1 block">Status</label>
+                  <select id="statusFilter" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                      <option value="all">Semua Status</option>
+                      <option value="OK">Hanya OK</option>
+                      <option value="NG">Hanya NG</option>
+                  </select>
+              </div>
+              <div>
+                  <label for="fromDate" class="text-xs font-semibold text-slate-600 mb-1 block">Dari Tanggal</label>
+                  <input type="date" id="fromDate" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+              </div>
+              <div>
+                  <label for="toDate" class="text-xs font-semibold text-slate-600 mb-1 block">Sampai Tanggal</label>
+                  <input type="date" id="toDate" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+              </div>
+          </div>
+          <div class="mt-4 text-right">
+              <button id="resetFiltersBtn" class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-200 rounded-lg hover:bg-slate-300 transition-colors">Reset Filter</button>
+          </div>
       </div>
 
       <div class="overflow-x-auto">
@@ -58,21 +102,67 @@
           <tbody class="bg-white divide-y divide-slate-200"></tbody>
         </table>
       </div>
+      
+      <!-- Kontrol Paginasi -->
+      <div id="paginationControls" class="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50 border-t border-slate-200">
+          <div class="flex items-center gap-2">
+              <span class="text-sm text-slate-600">Baris per halaman:</span>
+              <select id="rowsPerPage" class="border border-slate-300 rounded-md px-2 py-1 text-sm">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+              </select>
+          </div>
+          <div class="text-sm text-slate-700 font-medium">
+              <span id="totalInfo"></span>
+          </div>
+          <div class="flex items-center gap-2">
+              <span id="pageInfo" class="text-sm text-slate-700 mr-2"></span>
+              <button id="prevPageBtn" class="px-3 py-1 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-100">Sebelumnya</button>
+              <button id="nextPageBtn" class="px-3 py-1 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-100">Berikutnya</button>
+          </div>
+      </div>
+
     </div>
     <footer class="text-center mt-8 text-sm text-slate-500">
       <p>Dashboard Analisis Sampel</p>
     </footer>
   </div>
 
-  <script>
+  <script type="module">
+    const { createClient } = supabase;
     const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
     const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqcnd2b3p1eWlkamZ5amZxcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjIwMjgsImV4cCI6MjA2Nzk5ODAyOH0.u5t_yWbYINBKldTl-0dMjo006zTxExfx8kvKmntrkNE";
+    const supabaseClient = createClient(supabaseUrl, anonKey);
 
+    // DOM Elements
     const tableBody = document.querySelector("#dataTable tbody");
-    const refreshBtn = document.querySelector("#refreshBtn");
-    const refreshIcon = document.querySelector("#refreshIcon");
+    const statusDot = document.querySelector("#statusDot");
+    const statusText = document.querySelector("#statusText");
+    const searchInput = document.querySelector("#searchInput");
+    const statusFilter = document.querySelector("#statusFilter");
+    const fromDateInput = document.querySelector("#fromDate");
+    const toDateInput = document.querySelector("#toDate");
+    const resetFiltersBtn = document.querySelector("#resetFiltersBtn");
+    const paginationControls = document.querySelector("#paginationControls");
+    const pageInfo = document.querySelector("#pageInfo");
+    const totalInfo = document.querySelector("#totalInfo");
+    const prevPageBtn = document.querySelector("#prevPageBtn");
+    const nextPageBtn = document.querySelector("#nextPageBtn");
+    const rowsPerPageSelect = document.querySelector("#rowsPerPage");
+
+    // State
+    let currentPage = 1;
+    let rowsPerPage = 10;
+    let totalRows = 0;
+    let currentSearchTerm = '';
+    let currentStatusFilter = 'all';
+    let currentFromDate = '';
+    let currentToDate = '';
+    let debounceTimer;
 
     function formatFromHeader(day, month, year, time) {
+      if (!day || !month || !year || !time) return "-";
       const fullDate = `20${year}-${month}-${day}T${time}`;
       const d = new Date(fullDate);
       if (isNaN(d.getTime())) return `${day}/${month}/${year} ${time}`;
@@ -81,115 +171,257 @@
         hour: "2-digit", minute: "2-digit", second: "2-digit"
       });
     }
-
-    async function loadData() {
-      refreshIcon.classList.add('animate-spin');
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="8" class="text-center p-10 text-slate-500">Memuat data...</td>
-        </tr>
-      `;
-
-      try {
-        const resHeader = await fetch(`${supabaseUrl}/rest/v1/result_header?order=created_at.desc&limit=10`, {
-          headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
-        });
-
-        const headersData = await resHeader.json();
-        tableBody.innerHTML = "";
-
-        if (headersData.length === 0) {
-          tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-slate-500">Tidak ada data.</td></tr>`;
-          return;
+    
+    function renderRow(header, elements, isNew = false) {
+        const total = elements.length;
+        const ngCount = elements.filter(el => el.element_flag === ">" || el.element_flag === "<").length;
+        const status = ngCount > 0 ? "NG" : "OK";
+        
+        if (currentStatusFilter !== 'all' && status !== currentStatusFilter) {
+            return;
         }
 
-        for (const header of headersData) {
-          const resultId = header.id;
-          const resElements = await fetch(`${supabaseUrl}/rest/v1/result_element?result_id=eq.${resultId}`, {
-            headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
-          });
-          const elements = await resElements.json();
+        const waktu = formatFromHeader(header.day, header.month, header.year, header.time);
+        const badgeClass = status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
+        const rowHover = status === "OK" ? "hover:bg-green-50/50" : "hover:bg-red-50/50";
 
-          const total = elements.length;
-          const ngCount = elements.filter(el => el.element_flag === ">" || el.element_flag === "<").length;
-          const status = ngCount > 0 ? "NG" : "OK";
+        const row = document.createElement("tr");
+        row.className = `cursor-pointer transition-colors duration-200 ${rowHover}`;
+        row.dataset.id = header.id;
+        if (isNew) row.classList.add('new-row');
+        
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-slate-600">${waktu}</td>
+            <td class="px-6 py-4 whitespace-nowrap font-semibold text-slate-800">${header.grade ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-slate-600">${header.analytical_method ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">${header.runs_done ?? "-"}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">${total}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-center font-bold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
+            <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeClass}">${status}</span></td>
+            <td class="px-6 py-4 whitespace-nowrap text-right"><svg class="h-5 w-5 text-slate-400 transition-transform duration-300 chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></td>
+        `;
 
-          const waktu = formatFromHeader(header.day, header.month, header.year, header.time);
-          const badgeClass = status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800";
-          const rowHover = status === "OK" ? "hover:bg-green-50/50" : "hover:bg-red-50/50";
-
-          const row = document.createElement("tr");
-          row.className = `cursor-pointer transition-colors duration-200 ${rowHover}`;
-          row.innerHTML = `
-            <td class="px-6 py-4 text-slate-600">${waktu}</td>
-            <td class="px-6 py-4 font-semibold text-slate-800">${header.grade}</td>
-            <td class="px-6 py-4 text-slate-600">${header.analytical_method}</td>
-            <td class="px-6 py-4 text-center text-slate-600">${header.runs_done}</td>
-            <td class="px-6 py-4 text-center text-slate-600">${total}</td>
-            <td class="px-6 py-4 text-center font-bold ${ngCount > 0 ? 'text-red-600' : 'text-slate-700'}">${ngCount}</td>
-            <td class="px-6 py-4">
-              <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full ${badgeClass}">
-                ${status}
-              </span>
-            </td>
-            <td class="px-6 py-4 text-right">
-              <svg class="h-5 w-5 text-slate-400 transition-transform duration-300 chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-              </svg>
-            </td>
-          `;
-
-          const detailRow = document.createElement("tr");
-          const detailCell = document.createElement("td");
-          detailCell.colSpan = 8;
-          detailCell.className = "p-0";
-
-          const detailContent = document.createElement("div");
-          detailContent.className = "detail-content";
-
-          const inner = document.createElement("div");
-          inner.className = "p-5 bg-slate-50";
-
-          const elementTable = document.createElement("table");
-          elementTable.className = "min-w-full text-xs";
-          elementTable.innerHTML = `
+        const detailRow = document.createElement("tr");
+        detailRow.dataset.id = `detail-${header.id}`;
+        const detailCell = document.createElement("td");
+        detailCell.colSpan = 8;
+        detailCell.className = "p-0";
+        const detailContent = document.createElement("div");
+        detailContent.className = "detail-content";
+        const inner = document.createElement("div");
+        inner.className = "p-5 bg-slate-50";
+        const elementTable = document.createElement("table");
+        elementTable.className = "min-w-full text-xs";
+        elementTable.innerHTML = `
             <thead class="bg-slate-200">
-              <tr><th class="py-2 px-4">Elemen</th><th class="py-2 px-4">Nilai</th><th class="py-2 px-4">Flag</th></tr>
+                <tr>
+                    <th class="py-2 px-4 text-left font-semibold text-slate-600 rounded-tl-lg">Elemen</th>
+                    <th class="py-2 px-4 text-left font-semibold text-slate-600">Nilai</th>
+                    <th class="py-2 px-4 text-left font-semibold text-slate-600 rounded-tr-lg">Flag</th>
+                </tr>
             </thead>
             <tbody>
-              ${elements.map(el => `
-                <tr class="border-b hover:bg-slate-100">
-                  <td class="py-2 px-4">${el.element_name}</td>
-                  <td class="py-2 px-4">${el.element_value}</td>
-                  <td class="py-2 px-4 font-bold ${el.element_flag === ">" || el.element_flag === "<" ? "text-red-600" : "text-green-600"}">${el.element_flag || "OK"}</td>
+                ${elements.map(el => `
+                <tr class="border-b border-slate-200 last:border-b-0 hover:bg-slate-100">
+                    <td class="py-2 px-4 text-slate-600">${el.element_name ?? "-"}</td>
+                    <td class="py-2 px-4 text-slate-600">${el.element_value ?? "-"}</td>
+                    <td class="py-2 px-4 font-bold ${el.element_flag === ">" || el.element_flag === "<" ? "text-red-600" : "text-green-600"}">${el.element_flag || "OK"}</td>
                 </tr>`).join("")}
             </tbody>
-          `;
+        `;
+        inner.appendChild(elementTable);
+        detailContent.appendChild(inner);
+        detailCell.appendChild(detailContent);
+        detailRow.appendChild(detailCell);
 
-          inner.appendChild(elementTable);
-          detailContent.appendChild(inner);
-          detailCell.appendChild(detailContent);
-          detailRow.appendChild(detailCell);
-
-          row.addEventListener("click", () => {
+        row.addEventListener("click", () => {
             const icon = row.querySelector('.chevron-icon');
             detailContent.classList.toggle("expanded");
             icon.classList.toggle("rotate-180");
-          });
+        });
 
-          tableBody.appendChild(row);
-          tableBody.appendChild(detailRow);
+        if (isNew) {
+            tableBody.prepend(detailRow);
+            tableBody.prepend(row);
+        } else {
+            tableBody.appendChild(row);
+            tableBody.appendChild(detailRow);
         }
-      } catch (e) {
-        console.error(e);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-red-600">Error: ${e.message}</td></tr>`;
-      } finally {
-        refreshIcon.classList.remove('animate-spin');
-      }
     }
 
-    refreshBtn.addEventListener("click", loadData);
+    function updatePaginationControls() {
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+        const displayedRows = tableBody.querySelectorAll('tr[data-id]').length;
+
+        pageInfo.textContent = `Halaman ${currentPage} dari ${totalPages || 1}`;
+        
+        if (totalRows > 0) {
+            totalInfo.textContent = `Menampilkan ${displayedRows} dari ${totalRows} total`;
+        } else {
+            totalInfo.textContent = '';
+        }
+        
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
+        
+        if (totalRows === 0) {
+            paginationControls.classList.add('hidden');
+        } else {
+            paginationControls.classList.remove('hidden');
+        }
+    }
+
+    async function loadData() {
+      tableBody.innerHTML = `
+        <tr><td colspan="8" class="text-center p-10 text-slate-500">
+            <div class="flex justify-center items-center space-x-2">
+                <svg class="animate-spin h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span>Memuat data...</span>
+            </div>
+        </td></tr>`;
+      paginationControls.classList.add('hidden');
+
+      try {
+        const from = (currentPage - 1) * rowsPerPage;
+        const to = from + rowsPerPage - 1;
+
+        let query = supabaseClient
+          .from('result_header')
+          .select('*', { count: 'exact' }) // Minta total count dari Supabase
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
+        if (currentSearchTerm) {
+            const searchTerm = `%${currentSearchTerm}%`;
+            query = query.or(`grade.ilike.${searchTerm},analytical_method.ilike.${searchTerm}`);
+        }
+        
+        if (currentFromDate) {
+            query = query.gte('created_at', new Date(currentFromDate).toISOString());
+        }
+        if (currentToDate) {
+            const toDateEnd = new Date(currentToDate);
+            toDateEnd.setHours(23, 59, 59, 999);
+            query = query.lte('created_at', toDateEnd.toISOString());
+        }
+
+        const { data: headersData, error, count } = await query;
+        if (error) throw error;
+        
+        totalRows = count;
+        tableBody.innerHTML = "";
+
+        for (const header of headersData) {
+          const { data: elements } = await supabaseClient.from('result_element').select('*').eq('result_id', header.id);
+          renderRow(header, elements || []);
+        }
+        
+        const renderedCount = tableBody.querySelectorAll('tr[data-id]').length;
+        if (headersData.length > 0 && renderedCount === 0) {
+             tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-slate-500">Tidak ada data yang cocok dengan filter status di halaman ini.</td></tr>`;
+        } else if (headersData.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-slate-500">Tidak ada data yang cocok dengan filter Anda.</td></tr>`;
+        }
+        
+        updatePaginationControls();
+
+      } catch (e) {
+        console.error(e);
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-10 text-red-600 bg-red-50"><strong>Error:</strong> ${e.message}</td></tr>`;
+      }
+    }
+    
+    function updateConnectionStatus(status) {
+        if (status === 'SUBSCRIBED') {
+            statusDot.className = 'h-3 w-3 rounded-full bg-green-500 animate-pulse';
+            statusText.textContent = 'Live';
+        } else {
+            statusDot.className = 'h-3 w-3 rounded-full bg-red-500';
+            statusText.textContent = 'Offline';
+        }
+    }
+
+    function subscribeToChanges() {
+        const channel = supabaseClient.channel('result_header_changes')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'result_header' }, (payload) => {
+              console.log('Perubahan diterima! Memuat ulang data.');
+              loadData();
+          })
+          .subscribe(updateConnectionStatus);
+    }
+    
+    function setupEventListeners() {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                currentPage = 1;
+                currentSearchTerm = e.target.value;
+                loadData();
+            }, 300);
+        });
+
+        statusFilter.addEventListener('change', (e) => {
+            currentPage = 1;
+            currentStatusFilter = e.target.value;
+            loadData();
+        });
+        
+        fromDateInput.addEventListener('change', (e) => {
+            currentPage = 1;
+            currentFromDate = e.target.value;
+            loadData();
+        });
+        
+        toDateInput.addEventListener('change', (e) => {
+            currentPage = 1;
+            currentToDate = e.target.value;
+            loadData();
+        });
+        
+        resetFiltersBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            statusFilter.value = 'all';
+            fromDateInput.value = '';
+            toDateInput.value = '';
+            rowsPerPageSelect.value = '10';
+            
+            currentPage = 1;
+            rowsPerPage = 10;
+            currentSearchTerm = '';
+            currentStatusFilter = 'all';
+            currentFromDate = '';
+            currentToDate = '';
+            
+            loadData();
+        });
+
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadData();
+            }
+        });
+
+        nextPageBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadData();
+            }
+        });
+
+        rowsPerPageSelect.addEventListener('change', (e) => {
+            currentPage = 1;
+            rowsPerPage = parseInt(e.target.value, 10);
+            loadData();
+        });
+    }
+
+    // Initial Load
     loadData();
+    subscribeToChanges();
+    setupEventListeners();
+
   </script>
 </body>
 </html>
