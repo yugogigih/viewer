@@ -5,24 +5,54 @@
   <title>Sample Viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: sans-serif; padding: 1rem; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f0f0f0;
+    }
+
+    tr:hover {
+      background-color: #f9f9f9;
+    }
   </style>
 </head>
 <body>
   <h2>Latest Samples</h2>
-  <table id="dataTable"><thead></thead><tbody></tbody></table>
+  <table id="dataTable">
+    <thead></thead>
+    <tbody></tbody>
+  </table>
 
   <script>
+    // GANTI dengan Supabase Project URL kamu
     const supabaseUrl = "https://yjrwvozuyidjfyjfqqnu.supabase.co";
-    const table = "result_header";
-    const anonKey = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6..."; // Ganti dengan anon key kamu
 
-    fetch(`${supabaseUrl}/rest/v1/${table}?order=created_at.desc&limit=10`, {
+    // GANTI dengan anon key Supabase kamu, TANPA "Bearer"
+    const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqcnd2b3p1eWlkamZ5amZxcW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjIwMjgsImV4cCI6MjA2Nzk5ODAyOH0.u5t_yWbYINBKldTl-0dMjo006zTxExfx8kvKmntrkNE";
+
+    // Tabel yang ingin ditampilkan
+    const tableName = "result_header";
+
+    // Fetch data dari Supabase
+    fetch(`${supabaseUrl}/rest/v1/${tableName}?order=created_at.desc&limit=10`, {
       headers: {
         apikey: anonKey,
-        Authorization: anonKey
+        Authorization: `Bearer ${anonKey}`
       }
     })
     .then(res => res.json())
@@ -39,6 +69,11 @@
       } else {
         tableBody.innerHTML = "<tr><td colspan='100%'>No data found</td></tr>";
       }
+    })
+    .catch(err => {
+      document.querySelector("#dataTable tbody").innerHTML =
+        `<tr><td colspan='100%'>Error fetching data: ${err.message}</td></tr>`;
+      console.error("Fetch error:", err);
     });
   </script>
 </body>
